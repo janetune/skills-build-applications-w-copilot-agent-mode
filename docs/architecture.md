@@ -28,22 +28,18 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 ## Implementation decisions
 
-Record your plan here before editing code.
-
-- Presentation tier decision:
-- Logic tier decision:
-- Data tier decision:
-- Activity tracking approach:
-- Team management approach:
-- Leaderboard approach:
-- Workout suggestions approach:
+- Presentation tier decision: Build a thin React interface in the Vite app that renders the four primary routes (activities, teams, leaderboard, workouts) using a shared API client, Bootstrap styling, and accessible status states. The UI should fetch data from `/api`, show loading while pending, render empty/error states intentionally, and never leak backend implementation details.
+- Logic tier decision: Keep Express route handlers focused on request validation, persistence orchestration, and response shaping. The logic layer will validate IDs and payloads before persisting, map business rules to model data, and return deliberate 4xx responses instead of unhandled cast errors or generic 500s.
+- Data tier decision: Use Mongoose schemas and seed data to define the canonical contract for users, teams, activities, and workout suggestions. Reuse ObjectId references for user/team relationships, keep required fields explicit in schema validation, and seed realistic sample data that exercises the leaderboard and recommendation logic.
+- Activity tracking approach: Accept `userId`, `teamId`, `type`, and `minutes` in POST `/api/activities`, verify the referenced user and team exist, reject invalid IDs with a deliberate 4xx, and compute `points` and `occurredAt` server-side so the contract is consistent across clients.
+- Team management approach: Require a team `name` and keep `mascot` and `members` in the persisted document. `members` should be stored as actual user references or identifiers so the team listing and dashboard can render membership data reliably.
+- Leaderboard approach: Aggregate total points by team from the activities collection, sort descending by total points, assign a 1-based rank, and return objects shaped as `{ teamName, totalPoints, rank }` so the UI can render a leaderboard without extra processing.
+- Workout suggestions approach: Match the requested user email to a seeded user, inspect that user's recent activity pattern or fitness goal, and return workout suggestions ordered by relevance. The first suggestion should match the user's focus, include a `reason`, and fall back to a deliberate 4xx when the email does not map to a user.
 
 ## Test plan
 
-Record the commands you run and what each failure means.
-
-- Data-tier command: `npm run test:data --prefix octofit-tracker/backend`
-- API command: `npm run test:api --prefix octofit-tracker/backend`
-- Frontend command: `npm test --prefix octofit-tracker/frontend`
-- Backend build command: `npm run build --prefix octofit-tracker/backend`
-- Frontend build command: `npm run build --prefix octofit-tracker/frontend`
+- Data-tier command: `npm run test:data --prefix octofit-tracker/backend` — validates the schema contract for users, teams, activities, and workouts. Failures here usually mean required fields, relationships, or typed defaults are not enforced in Mongoose.
+- API command: `npm run test:api --prefix octofit-tracker/backend` — validates route behavior and HTTP contracts. Failures here indicate the Express layer is returning the wrong status codes, missing JSON fields, or incorrect rankings/suggestions.
+- Frontend command: `npm test --prefix octofit-tracker/frontend` — validates the actual React UI contract. Failures here mean the presentation layer is not rendering the expected data, loading states, empty states, or accessible error messages.
+- Backend build command: `npm run build --prefix octofit-tracker/backend` — confirms TypeScript and backend integration compile cleanly after the data and API fixes.
+- Frontend build command: `npm run build --prefix octofit-tracker/frontend` — confirms the Vite app still compiles after wiring the React routes and API client to the backend contract.
